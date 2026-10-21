@@ -1,6 +1,6 @@
 #include <iostream>
 #include <vector>
-#include <memory>
+#include "include/BinarySearchTree.h"
 using namespace std;
 
 
@@ -35,9 +35,15 @@ int search(const vector<int>& v, int x) {
 
 int main() {
 
+    BinarySearchTree<int> tree;
+    tree.append(1);
+    tree.append(4);
+    tree.append(1);
+    tree.append(7);
+    int x = tree.size();
+    bool result = tree.contains(1);
 
-
-
+    cout << x;
 }
 
 
