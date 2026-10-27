@@ -1,39 +1,72 @@
-//
-// Created by bladerunner on 10/19/26.
-//
-
 #ifndef LAB1_BINARYTREE_H
 #define LAB1_BINARYTREE_H
-#include <cstddef>    // std::size_t
-#include <functional> // std::less
+
+#include <cstddef>
+#include <functional>
 #include <memory>
 #include <utility>
 
-using namespace std;
-
 template <typename T, typename Compare = std::less<T>>
-
 class BinarySearchTree {
 private:
     struct Node {
         T value;
-        unique_ptr<Node> left;
-        unique_ptr<Node> right;
 
-        explicit Node(const T& item) : value(item) {}
+        std::unique_ptr<Node> left;
+        std::unique_ptr<Node> right;
+
+        Node* parent = nullptr;
+
+        explicit Node(const T& item, Node* parentNode = nullptr)
+            : value(item), parent(parentNode) {}
     };
 
-    unique_ptr<Node> root;
+    std::unique_ptr<Node> root;
     std::size_t size_ = 0;
     Compare compare_;
+
+    // target должен быть непустым узлом этого дерева.
+    std::unique_ptr<Node>& getOwner(Node* target) {
+        if (target->parent == nullptr) {
+            return root;
+        }
+
+        if (target->parent->left.get() == target) {
+            return target->parent->left;
+        }
+
+        return target->parent->right;
+    }
 
 public:
     BinarySearchTree() = default;
 
-    BinarySearchTree(Compare compare) : compare_(move(compare)) {}
+    explicit BinarySearchTree(Compare compare)
+        : compare_(std::move(compare)) {}
 
-    bool contains(const T& target) {
+    ~BinarySearchTree() {
+        clear();
+    }
+
+    BinarySearchTree(const BinarySearchTree&) = delete;
+    BinarySearchTree& operator=(const BinarySearchTree&) = delete;
+
+    bool empty() const noexcept {
+        return size_ == 0;
+    }
+
+    std::size_t size() const noexcept {
+        return size_;
+    }
+
+    void clear() noexcept {
+        root.reset();
+        size_ = 0;
+    }
+
+    bool contains(const T& target) const {
         const Node* current = root.get();
+
         while (current != nullptr) {
             if (compare_(target, current->value)) {
                 current = current->left.get();
@@ -45,17 +78,13 @@ public:
                 return true;
             }
         }
+
         return false;
     }
 
-
-    bool empty() const noexcept {
-        return size_ == 0;
-    }
-
     bool append(const T& data) {
-        if (root == nullptr) {
-            root = std::make_unique<Node>(data);
+        if (!root) {
+            root = std::make_unique<Node>(data, nullptr);
             ++size_;
             return true;
         }
@@ -68,7 +97,9 @@ public:
                     current = current->left.get();
                 }
                 else {
-                    current->left = std::make_unique<Node>(data);
+                    current->left =
+                        std::make_unique<Node>(data, current);
+
                     ++size_;
                     return true;
                 }
@@ -78,7 +109,9 @@ public:
                     current = current->right.get();
                 }
                 else {
-                    current->right = std::make_unique<Node>(data);
+                    current->right =
+                        std::make_unique<Node>(data, current);
+
                     ++size_;
                     return true;
                 }
@@ -89,18 +122,74 @@ public:
         }
     }
 
-    std::size_t size() const noexcept {
-        return size_;
-    }
+    bool erase(const T& target) {
+        Node* current = root.get();
 
-    void clear() {
-        root.reset();
-        size_ = 0;
-    }
+        while (current != nullptr) {
+            if (compare_(target, current->value)) {
+                current = current->left.get();
+            }
+            else if (compare_(current->value, target)) {
+                current = current->right.get();
+            }
+            else {
+                break;
+            }
+        }
 
+        if (current == nullptr) {
+            return false;
+        }
 
-    ~BinarySearchTree() {
-        clear();
+        // Нет потомков или есть только один.
+        if (!current->left || !current->right) {
+            Node* parent = current->parent;
+            std::unique_ptr<Node>& owner = getOwner(current);
+
+            std::unique_ptr<Node> replacement;
+
+            if (current->left) {
+                replacement = std::move(current->left);
+            }
+            else {
+                replacement = std::move(current->right);
+            }
+
+            if (replacement) {
+                replacement->parent = parent;
+            }
+
+            owner = std::move(replacement);
+
+            --size_;
+            return true;
+        }
+
+        // Есть два потомка.
+        Node* minimal = current->right.get();
+
+        while (minimal->left) {
+            minimal = minimal->left.get();
+        }
+
+        current->value = minimal->value;
+
+        Node* parent_of_minimal = minimal->parent;
+
+        std::unique_ptr<Node>& minimal_owner = getOwner(minimal);
+
+        std::unique_ptr<Node> replacement =
+            std::move(minimal->right);
+
+        if (replacement) {
+            replacement->parent = parent_of_minimal;
+        }
+
+        minimal_owner = std::move(replacement);
+
+        --size_;
+        return true;
     }
 };
-#endif //LAB1_BINARYTREE_H
+
+#endif // LAB1_BINARYTREE_H
