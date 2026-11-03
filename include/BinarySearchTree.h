@@ -38,8 +38,22 @@ private:
         return target->parent->right;
     }
 
+    std::unique_ptr<Node> clone(const Node* source, Node* parent) {
+        if (source == nullptr) {
+            return nullptr;
+        }
+        auto copy = std::make_unique<Node>(source->value, parent);
+        copy->left = clone(source->left.get(), copy.get());
+        copy->right = clone(source->right.get(), copy.get());
+
+        return copy;
+    }
+
 public:
     BinarySearchTree() = default;
+
+    template <typename Func>
+    BinarySearchTree map( Func func) const;
 
     explicit BinarySearchTree(Compare compare)
         : compare_(std::move(compare)) {}
@@ -48,8 +62,8 @@ public:
         clear();
     }
 
-    BinarySearchTree(const BinarySearchTree&) = delete;
-    BinarySearchTree& operator=(const BinarySearchTree&) = delete;
+    BinarySearchTree(BinarySearchTree&&) = default;
+    BinarySearchTree& operator=(BinarySearchTree&&) = default;
 
     bool empty() const noexcept {
         return size_ == 0;
@@ -82,7 +96,7 @@ public:
         return false;
     }
 
-    bool append(const T& data) {
+    bool insert(const T& data) {
         if (!root) {
             root = std::make_unique<Node>(data, nullptr);
             ++size_;
@@ -191,5 +205,7 @@ public:
         return true;
     }
 };
+
+#include "TreeAlgorithms.h"
 
 #endif // LAB1_BINARYTREE_H
