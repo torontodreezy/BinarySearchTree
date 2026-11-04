@@ -5,6 +5,7 @@
 #include <functional>
 #include <memory>
 #include <utility>
+#include <stack>
 
 template <typename T, typename Compare = std::less<T>>
 class BinarySearchTree {
@@ -52,9 +53,6 @@ private:
 public:
     BinarySearchTree() = default;
 
-    template <typename Func>
-    BinarySearchTree map( Func func) const;
-
     explicit BinarySearchTree(Compare compare)
         : compare_(std::move(compare)) {}
 
@@ -62,8 +60,24 @@ public:
         clear();
     }
 
-    BinarySearchTree(BinarySearchTree&&) = default;
-    BinarySearchTree& operator=(BinarySearchTree&&) = default;
+    //move конструктор
+    BinarySearchTree(BinarySearchTree&& other) noexcept
+        : root(std::move(other.root)),
+          size_(std::exchange(other.size_, 0)),
+          compare_(std::move(other.compare_)) {}
+
+    BinarySearchTree& operator=(BinarySearchTree&& other) noexcept {
+        if (this == &other) {
+            return *this;
+        }
+
+        clear();
+        compare_ = std::move(other.compare_);
+        root = std::move(other.root);
+        size_ = std::exchange(other.size_, 0);
+
+        return *this;
+    }
 
     bool empty() const noexcept {
         return size_ == 0;
@@ -204,8 +218,19 @@ public:
         --size_;
         return true;
     }
+    // объявление метода map
+    template <typename Func>
+    BinarySearchTree map(Func func) const;
 };
+//реализация
+template <typename T, typename Compare>
+template <typename Func>
+BinarySearchTree<T, Compare>
+BinarySearchTree<T, Compare>::map(Func func) const {
+    BinarySearchTree<T, Compare> result(compare_);
 
-#include "TreeAlgorithms.h"
+    return result;
+}
+
 
 #endif // LAB1_BINARYTREE_H
