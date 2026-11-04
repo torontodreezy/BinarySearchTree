@@ -1,18 +1,11 @@
 #include <iostream>
 #include "include/BinarySearchTree.h"
-
+#include "include/BinarySearchTreeTests.h"
+#include <cassert>
 using namespace std;
 
 
 
 int main() {
-    BinarySearchTree<int> tree;
-
-    for (int value : {50, 30, 70, 20, 40, 60, 80, 35, 45, 37}) {
-        tree.insert(value);
-    }
-
-   tree.erase(30);
-
-    cout << tree.contains(70);
+    runTests();
 }

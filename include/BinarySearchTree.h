@@ -222,9 +222,18 @@ public:
     // объявление метода map
     template <typename Func>
     BinarySearchTree map(Func func) const;
+
+    // объявление метода where
+    template <typename Predicate>
+    BinarySearchTree where(Predicate lambda) const;
+
+    // объявление метода reduce
+    template <typename Accumulator, typename func>
+    Accumulator reduce(Accumulator start, func lambda) const;
+
 };
 
-//реализация
+//реализация map
 template <typename T, typename Compare>
 template <typename Func>
 BinarySearchTree<T, Compare>
@@ -238,12 +247,65 @@ BinarySearchTree<T, Compare>::map(Func func) const {
     while (!nodes.empty()) {
         const Node* current = nodes.top();
         nodes.pop();
+        result.insert(func (current->value));
         if (current->right.get() != nullptr) {
             nodes.push(current->right.get());
         }
         if (current->left.get() != nullptr) {
             nodes.push(current->left.get());
         }
+    }
+    return result;
+}
+
+//реализация where
+
+template <typename T, typename Compare>
+template <typename Predicate>
+BinarySearchTree<T, Compare>
+BinarySearchTree<T, Compare>::where(Predicate lambda) const {
+    BinarySearchTree<T, Compare> result(compare_);
+    std::stack<const Node*> nodes;
+    // обход
+    if (root) {
+        nodes.push(root.get());
+    }
+    while (!nodes.empty()) {
+        const Node* current = nodes.top();
+        nodes.pop();
+        if (lambda(current->value)) {
+            result.insert(current->value);
+        }
+        if (current->right.get() != nullptr) {
+            nodes.push(current->right.get());
+        }
+        if (current->left.get() != nullptr) {
+            nodes.push(current->left.get());
+        }
+    }
+    return result;
+}
+
+template <typename T, typename Compare>
+template <typename Accumulator, typename func>
+Accumulator
+BinarySearchTree<T, Compare>::reduce(Accumulator start, func lambda) const {
+    Accumulator result = start;
+    std::stack<const Node*> nodes;
+    if (root.get()) {
+        nodes.push(root.get());
+    }
+    while (!nodes.empty()) {
+        const Node* current = nodes.top();
+        nodes.pop();
+        result = lambda(result, current->value);
+        if (current->right.get() != nullptr) {
+            nodes.push(current->right.get());
+        }
+        if (current->left.get() != nullptr) {
+            nodes.push(current->left.get());
+        }
+
     }
     return result;
 }
