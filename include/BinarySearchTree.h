@@ -39,13 +39,17 @@ private:
         return target->parent->right;
     }
 
-    std::unique_ptr<Node> clone(const Node* source, Node* parent) {
+    std::unique_ptr<Node> clone(const Node* source, Node* parent, std::size_t& count) const{
+
         if (source == nullptr) {
             return nullptr;
         }
+
         auto copy = std::make_unique<Node>(source->value, parent);
-        copy->left = clone(source->left.get(), copy.get());
-        copy->right = clone(source->right.get(), copy.get());
+        count++;
+        copy->left = clone(source->left.get(), copy.get(), count);
+
+        copy->right = clone(source->right.get(), copy.get(), count);
 
         return copy;
     }
@@ -231,6 +235,8 @@ public:
     template <typename Accumulator, typename func>
     Accumulator reduce(Accumulator start, func lambda) const;
 
+    // извлечение поддерева
+    BinarySearchTree extractSubtree(const T& target) const;
 };
 
 //реализация map
@@ -247,7 +253,7 @@ BinarySearchTree<T, Compare>::map(Func func) const {
     while (!nodes.empty()) {
         const Node* current = nodes.top();
         nodes.pop();
-        result.insert(func (current->value));
+        result.insert(func(current->value));
         if (current->right.get() != nullptr) {
             nodes.push(current->right.get());
         }
@@ -305,10 +311,33 @@ BinarySearchTree<T, Compare>::reduce(Accumulator start, func lambda) const {
         if (current->left.get() != nullptr) {
             nodes.push(current->left.get());
         }
-
     }
     return result;
 }
 
-
+template <typename T, typename Compare>
+BinarySearchTree<T, Compare>
+BinarySearchTree<T, Compare>::extractSubtree(const T& target) const {
+    BinarySearchTree<T, Compare> result(compare_);
+    std::size_t count = 0;
+    const Node* current = nullptr;
+    if (root) {
+        current = root.get();
+    }
+    //поиск нужной ноды
+    while (current != nullptr) {
+        if (compare_(current->value, target)) {
+            current = current->right.get();
+        }
+        else if (compare_(target, current->value)) {
+            current = current->left.get();
+        }
+        else {
+            break;
+        }
+    }
+    result.root = clone(current, nullptr, count);
+    result.size_ = count;
+    return result;
+}
 #endif // LAB1_BINARYTREE_H
