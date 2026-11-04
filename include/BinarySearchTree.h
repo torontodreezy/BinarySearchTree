@@ -218,17 +218,33 @@ public:
         --size_;
         return true;
     }
+
     // объявление метода map
     template <typename Func>
     BinarySearchTree map(Func func) const;
 };
+
 //реализация
 template <typename T, typename Compare>
 template <typename Func>
 BinarySearchTree<T, Compare>
 BinarySearchTree<T, Compare>::map(Func func) const {
     BinarySearchTree<T, Compare> result(compare_);
+    std::stack<const Node*> nodes;
+    if (root) {
+        nodes.push(root.get());
+    }
 
+    while (!nodes.empty()) {
+        const Node* current = nodes.top();
+        nodes.pop();
+        if (current->right.get() != nullptr) {
+            nodes.push(current->right.get());
+        }
+        if (current->left.get() != nullptr) {
+            nodes.push(current->left.get());
+        }
+    }
     return result;
 }
 
