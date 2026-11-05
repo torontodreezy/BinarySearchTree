@@ -279,7 +279,7 @@ public:
         return result;
     }
 
-    // объявление метода reduce
+    //reduce
     template <typename Accumulator, typename Func>
 Accumulator reduce(Accumulator start, Func func) const {
         static_assert(
@@ -300,6 +300,8 @@ Accumulator reduce(Accumulator start, Func func) const {
 
         return result;
     }
+    // объявление метода получения поддерева
+    BinarySearchTree extractSubtree(const T& target) const;
 };
 
 
