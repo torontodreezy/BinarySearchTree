@@ -253,22 +253,25 @@ public:
 
 
     //map
-    BinarySearchTree map(const std::function<T(const T&)>& func) const {
-        if (!func) {
-            throw std::invalid_argument("map: empty function");
-        }
+    template <typename Func>
+    BinarySearchTree map(Func func) const {
+        static_assert(
+            std::is_invocable_r_v<T, Func&, const T&>,
+            "map: incompatible function signature"
+        );
         BinarySearchTree result(compare_);
         traverse([&](const T& value) {
             result.insert(func(value));
         });
         return result;
     }
-
     // объявление метода where
-    BinarySearchTree where(const std::function<bool(const T&)>& predicate) const {
-        if (!predicate) {
-            throw std::invalid_argument("where: empty predicate");
-        }
+    template <typename Func>
+    BinarySearchTree where(Func predicate) const {
+        static_assert(
+            std::is_invocable_r_v<bool, Func&, const T&>,
+            "where: incompatible function signature"
+        );
         BinarySearchTree result(compare_);
 
         traverse([&](const T& value) {
@@ -300,6 +303,7 @@ Accumulator reduce(Accumulator start, Func func) const {
 
         return result;
     }
+
     // объявление метода получения поддерева
     BinarySearchTree extractSubtree(const T& target) const;
 };
