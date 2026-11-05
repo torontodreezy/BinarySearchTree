@@ -1,11 +1,13 @@
 #ifndef LAB1_BINARYTREE_H
 #define LAB1_BINARYTREE_H
 
+#include <type_traits>
 #include <cstddef>
 #include <functional>
 #include <memory>
 #include <utility>
 #include <stack>
+#include <stdexcept>
 
 template <typename T, typename Compare = std::less<T>>
 class BinarySearchTree {
@@ -13,45 +15,67 @@ private:
     struct Node {
         T value;
 
-        std::unique_ptr<Node> left;
-        std::unique_ptr<Node> right;
+        std::shared_ptr<Node> left;
+        std::shared_ptr<Node> right;
 
-        Node* parent = nullptr;
+        std::weak_ptr<Node> parent;
 
-        explicit Node(const T& item, Node* parentNode = nullptr)
+        explicit Node(const T& item, const std::shared_ptr<Node>& parentNode = nullptr)
             : value(item), parent(parentNode) {}
     };
 
-    std::unique_ptr<Node> root;
+    std::shared_ptr<Node> root;
     std::size_t size_ = 0;
     Compare compare_;
 
     // target должен быть непустым узлом этого дерева.
-    std::unique_ptr<Node>& getOwner(Node* target) {
-        if (target->parent == nullptr) {
+    std::shared_ptr<Node>& getOwner(const std::shared_ptr<Node>& target) {
+        auto parent = target->parent.lock();
+        if (!parent) {
             return root;
         }
 
-        if (target->parent->left.get() == target) {
-            return target->parent->left;
+        if (parent->left == target) {
+            return parent->left;
         }
 
-        return target->parent->right;
+        return parent->right;
     }
 
-    std::unique_ptr<Node> clone(const Node* source, Node* parent, std::size_t& count) const{
-
+    std::shared_ptr<Node> clone(const std::shared_ptr<const Node>& source, const std::shared_ptr<Node>& parent,
+                                std::size_t& count) const {
         if (source == nullptr) {
             return nullptr;
         }
 
-        auto copy = std::make_unique<Node>(source->value, parent);
+        auto copy = std::make_shared<Node>(source->value, parent);
         count++;
-        copy->left = clone(source->left.get(), copy.get(), count);
+        copy->left = clone(source->left, copy, count);
 
-        copy->right = clone(source->right.get(), copy.get(), count);
+        copy->right = clone(source->right, copy, count);
 
         return copy;
+    }
+
+    //private метод обход + лямбда
+    void traverse(const std::function<void(const T&)>& action) const {
+        std::stack<const Node*> nodes;
+        if (!root) {
+            return;
+        }
+        nodes.push(root.get());
+
+        while (!nodes.empty()) {
+            const Node* current = nodes.top();
+            nodes.pop();
+            action(current->value);
+            if (current->right.get() != nullptr) {
+                nodes.push(current->right.get());
+            }
+            if (current->left.get() != nullptr) {
+                nodes.push(current->left.get());
+            }
+        }
     }
 
 public:
@@ -97,14 +121,14 @@ public:
     }
 
     bool contains(const T& target) const {
-        const Node* current = root.get();
+        std::shared_ptr<const Node> current = root;
 
         while (current != nullptr) {
             if (compare_(target, current->value)) {
-                current = current->left.get();
+                current = current->left;
             }
             else if (compare_(current->value, target)) {
-                current = current->right.get();
+                current = current->right;
             }
             else {
                 return true;
@@ -116,21 +140,21 @@ public:
 
     bool insert(const T& data) {
         if (!root) {
-            root = std::make_unique<Node>(data, nullptr);
+            root = std::make_shared<Node>(data, nullptr);
             ++size_;
             return true;
         }
 
-        Node* current = root.get();
+        std::shared_ptr<Node> current = root;
 
         while (true) {
             if (compare_(data, current->value)) {
                 if (current->left) {
-                    current = current->left.get();
+                    current = current->left;
                 }
                 else {
                     current->left =
-                        std::make_unique<Node>(data, current);
+                        std::make_shared<Node>(data, current);
 
                     ++size_;
                     return true;
@@ -138,11 +162,11 @@ public:
             }
             else if (compare_(current->value, data)) {
                 if (current->right) {
-                    current = current->right.get();
+                    current = current->right;
                 }
                 else {
                     current->right =
-                        std::make_unique<Node>(data, current);
+                        std::make_shared<Node>(data, current);
 
                     ++size_;
                     return true;
@@ -155,14 +179,14 @@ public:
     }
 
     bool erase(const T& target) {
-        Node* current = root.get();
+        std::shared_ptr<Node> current = root;
 
         while (current != nullptr) {
             if (compare_(target, current->value)) {
-                current = current->left.get();
+                current = current->left;
             }
             else if (compare_(current->value, target)) {
-                current = current->right.get();
+                current = current->right;
             }
             else {
                 break;
@@ -175,10 +199,10 @@ public:
 
         // Нет потомков или есть только один.
         if (!current->left || !current->right) {
-            Node* parent = current->parent;
-            std::unique_ptr<Node>& owner = getOwner(current);
+            auto parent = current->parent.lock();
+            std::shared_ptr<Node>& owner = getOwner(current);
 
-            std::unique_ptr<Node> replacement;
+            std::shared_ptr<Node> replacement;
 
             if (current->left) {
                 replacement = std::move(current->left);
@@ -198,19 +222,19 @@ public:
         }
 
         // Есть два потомка.
-        Node* minimal = current->right.get();
+        std::shared_ptr<Node> minimal = current->right;
 
         while (minimal->left) {
-            minimal = minimal->left.get();
+            minimal = minimal->left;
         }
 
         current->value = minimal->value;
 
-        Node* parent_of_minimal = minimal->parent;
+        auto parent_of_minimal = minimal->parent.lock();
 
-        std::unique_ptr<Node>& minimal_owner = getOwner(minimal);
+        std::shared_ptr<Node>& minimal_owner = getOwner(minimal);
 
-        std::unique_ptr<Node> replacement =
+        std::shared_ptr<Node> replacement =
             std::move(minimal->right);
 
         if (replacement) {
@@ -223,114 +247,78 @@ public:
         return true;
     }
 
-    // объявление метода map
-    template <typename Func>
-    BinarySearchTree map(Func func) const;
+    // ограничения на func
+    // тз описание системы, требования
+    // лр 2 выбрать структуру с пояснением
+
+
+    //map
+    BinarySearchTree map(const std::function<T(const T&)>& func) const {
+        if (!func) {
+            throw std::invalid_argument("map: empty function");
+        }
+        BinarySearchTree result(compare_);
+        traverse([&](const T& value) {
+            result.insert(func(value));
+        });
+        return result;
+    }
 
     // объявление метода where
-    template <typename Predicate>
-    BinarySearchTree where(Predicate lambda) const;
+    BinarySearchTree where(const std::function<bool(const T&)>& predicate) const {
+        if (!predicate) {
+            throw std::invalid_argument("where: empty predicate");
+        }
+        BinarySearchTree result(compare_);
+
+        traverse([&](const T& value) {
+            if (predicate(value)) {
+                result.insert(value);
+            }
+        });
+        return result;
+    }
 
     // объявление метода reduce
-    template <typename Accumulator, typename func>
-    Accumulator reduce(Accumulator start, func lambda) const;
+    template <typename Accumulator, typename Func>
+Accumulator reduce(Accumulator start, Func func) const {
+        static_assert(
+            std::is_invocable_r_v<
+                Accumulator,
+                Func&,
+                Accumulator,
+                const T&
+            >,
+            "reduce: incompatible function signature"
+        );
 
-    // извлечение поддерева
-    BinarySearchTree extractSubtree(const T& target) const;
+        Accumulator result = start;
+
+        traverse([&](const T& value) {
+            result = func(result, value);
+        });
+
+        return result;
+    }
 };
 
-//реализация map
-template <typename T, typename Compare>
-template <typename Func>
-BinarySearchTree<T, Compare>
-BinarySearchTree<T, Compare>::map(Func func) const {
-    BinarySearchTree<T, Compare> result(compare_);
-    std::stack<const Node*> nodes;
-    if (root) {
-        nodes.push(root.get());
-    }
-
-    while (!nodes.empty()) {
-        const Node* current = nodes.top();
-        nodes.pop();
-        result.insert(func(current->value));
-        if (current->right.get() != nullptr) {
-            nodes.push(current->right.get());
-        }
-        if (current->left.get() != nullptr) {
-            nodes.push(current->left.get());
-        }
-    }
-    return result;
-}
-
-//реализация where
-
-template <typename T, typename Compare>
-template <typename Predicate>
-BinarySearchTree<T, Compare>
-BinarySearchTree<T, Compare>::where(Predicate lambda) const {
-    BinarySearchTree<T, Compare> result(compare_);
-    std::stack<const Node*> nodes;
-    // обход
-    if (root) {
-        nodes.push(root.get());
-    }
-    while (!nodes.empty()) {
-        const Node* current = nodes.top();
-        nodes.pop();
-        if (lambda(current->value)) {
-            result.insert(current->value);
-        }
-        if (current->right.get() != nullptr) {
-            nodes.push(current->right.get());
-        }
-        if (current->left.get() != nullptr) {
-            nodes.push(current->left.get());
-        }
-    }
-    return result;
-}
-
-template <typename T, typename Compare>
-template <typename Accumulator, typename func>
-Accumulator
-BinarySearchTree<T, Compare>::reduce(Accumulator start, func lambda) const {
-    Accumulator result = start;
-    std::stack<const Node*> nodes;
-    if (root.get()) {
-        nodes.push(root.get());
-    }
-    while (!nodes.empty()) {
-        const Node* current = nodes.top();
-        nodes.pop();
-        result = lambda(result, current->value);
-        if (current->right.get() != nullptr) {
-            nodes.push(current->right.get());
-        }
-        if (current->left.get() != nullptr) {
-            nodes.push(current->left.get());
-        }
-    }
-    return result;
-}
 
 template <typename T, typename Compare>
 BinarySearchTree<T, Compare>
 BinarySearchTree<T, Compare>::extractSubtree(const T& target) const {
     BinarySearchTree<T, Compare> result(compare_);
     std::size_t count = 0;
-    const Node* current = nullptr;
+    std::shared_ptr<const Node> current = nullptr;
     if (root) {
-        current = root.get();
+        current = root;
     }
     //поиск нужной ноды
     while (current != nullptr) {
         if (compare_(current->value, target)) {
-            current = current->right.get();
+            current = current->right;
         }
         else if (compare_(target, current->value)) {
-            current = current->left.get();
+            current = current->left;
         }
         else {
             break;

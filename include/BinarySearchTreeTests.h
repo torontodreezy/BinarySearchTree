@@ -376,6 +376,20 @@ inline void runTests() {
         expect(Tracked::alive, expectedAfterDestruction, "Живые объекты после деструктора");
     });
 
+    tests.run("extractSubtree: независимость и связи parent",
+              "BinarySearchTree extractSubtree(const T& target) const", [] {
+        auto tree = makeTree({8, 3, 10, 1, 6, 4, 7});
+        auto subtree = tree.extractSubtree(3);
+        expectValues(subtree, {3, 1, 6, 4, 7});
+        expectValues(tree.extractSubtree(42), {});
+        tree.clear();
+        expectValues(subtree, {3, 1, 6, 4, 7});
+        for (int value : {3, 6, 1, 4, 7}) {
+            expect(subtree.erase(value), true, "Удаление из копии поддерева");
+        }
+        expectValues(subtree, {});
+    });
+
     tests.print();
 }
 
